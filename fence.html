@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>fence</title>
+    <style>
+        *{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body{
+            height: 100vh;
+            overflow: hidden;
+            border
+        }
+        h1{
+            text-align: center;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        #main-can{
+            border: 1px solid red;
+            //display: float;
+            position: fixed;
+            width: 100%;
+            height: 100vh;
+            z-index: 1;
+            pointer-events: none;
+        }
+        #inputs{
+            padding: 3vh;
+            border: 1px solid red;
+            width: 25%;
+            display: inline-block;
+            z-index: 100;
+        }
+        #inputs input{
+            z-index: 1000;
+        }
+        #outputs{
+            border: 1px solid red;
+            width: 25%;
+            display: inline-block;
+            right: 0;
+            float: right;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="main-can"></canvas>
+    <h1>Muh Trees</h1>
+
+    <div id="inputs">
+        <!-- length, dimensions, distance_2_pole-->
+        <p>fence length:</p>
+        <input type="text" id="f-length" name="f_length" value=""><br>
+        <p>fence width:</p>
+        <input type="text" id="f-width" name="f_width" value=""><br>
+        <p>distance between poles:</p>
+        <input type="text" id="f-d2p" name="f_d" value=""><br><br>
+        <p>percent large poly-pots</p>
+        <input type="range" min="0" max="100" value="50" class="slider" id="percent"><br><br>
+        <button onclick="calcFence()">Enter</button>
+
+    </div>
+
+    <div id="outputs">
+        <!-- fence_meters, number_poles -->
+        <h3>Fence Material</h3>
+        <p>Total fence length (meters): <span id="total-fence"> </span> </p>
+        <p>Total number of rolls (100m): <span id="total-rolls"> </span> </p>
+        <p>Total number of poles (3m): <span id="total-poles"> </span> </p>
+        <p>Total number of pipes (6m): <span id="total-pipes"> </span> </p>
+        <br><br>
+        <p>Predicted number of poles (3m): <span id="predicted-poles"> </span> </p>
+        <p>Adjusted pole distance (dx): <span id="dx"> </span> </p>
+        <p>Adjusted pole distance (dy): <span id="dy"> </span> </p>
+        <br><br>
+        <h3>Trees</h3>
+        <p>number of rows (1.3m): <span id="total-rows"> </span></p>
+        <p>Predicted total saplings: <span id="total-saplings"> </span></p>
+        <p>Predicted total big polypots: <span id="total-big"> </span></p>
+        <p>Predicted total small polypots: <span id="total-small"> </span></p>
+        <!--
+        <p>Total water per day (cans): <span id="total-water"> </span> </p>
+        -->
+
+    </div>
+<script>
+    var canvas = document.getElementById('main-can')
+    console.log(canvas)
+    var c = canvas.getContext('2d')
+    //c.translate(0.1, 0.1);
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    function clearCanvas(){
+        c.clearRect(0, 0, canvas.width , canvas.height)
+    }
+    class Point{
+        constructor(x, y){
+            this.x = x
+            this.y = y
+        }
+    }
+    function drawCircle(center, radius, color_fill, color_line){
+        c.beginPath()
+        c.arc(center.x, center.y, radius, 0, 2*Math.PI)
+        c.fillStyle = color_fill
+        c.fill()
+        c.strokeStyle = color_line
+        //c.lineWidth = 4
+        c.stroke()
+    }
+    function drawLine(first, next, color){
+        //first, next : Point
+        //color : string
+        c.beginPath()
+        c.moveTo(first.x , first.y) // first point
+        c.lineTo(next.x , next.y) // next point
+        c.strokeStyle = color
+        c.lineWidth = 1
+        c.stroke()
+        c.closePath()
+    }
+    function drawRec(x0, y0, x1, y1, color){
+        c.beginPath()
+        c.rect(x0, y0, x1, y1)
+        c.strokeStyle = color
+        c.stroke()
+        c.fillStyle = color
+        c.fill()
+        c.closePath()
+    }
+    var p = new Point(canvas.width/2, canvas.height/2)
+    drawCircle(p, 3, 'red', 'white')
+    c.font = "12px Arial"
+    c.fillStyle = 'black'
+    c.textAlign = 'center'
+    c.fillText('welcome to muh tree nursery simulator ', canvas.width/2, canvas.height/2 - 10)
+    c.fillText('enter your measurements to get started', canvas.width/2, canvas.height/2 + 15)
+
+
+
+    //fence yooooooo\
+
+    function writeOut(totp,leng,d, dx, dy, nr, by, row_length){
+        var tf = document.getElementById('total-fence')
+        tf.innerHTML = leng
+        var tr = document.getElementById('total-rolls')
+        tr.innerHTML = Math.round(leng/100)
+        var tp = document.getElementById('total-poles')
+        tp.innerHTML = totp
+        var tp = document.getElementById('total-pipes')
+        tp.innerHTML = Math.ceil(totp/2)
+        var pp = document.getElementById('predicted-poles')
+        pp.innerHTML = Math.ceil(leng/d)
+
+        var x = document.getElementById('dx')
+        x.innerHTML = Math.round(dx * 10) / 10
+        var y = document.getElementById('dy')
+        y.innerHTML = Math.round(dy * 10) / 10
+
+        var numr = document.getElementById('total-rows')
+        numr.innerHTML = nr
+
+        var perc_big = document.getElementById('percent').value/100
+        console.log('percent big ', perc_big)
+        var perc_small = 1 - perc_big
+        var total_length = nr * row_length
+
+        //ss ~ 4inch diameter
+        var ss = .1
+
+        total_small = Math.floor(1.3/ss) * Math.floor(perc_small*total_length/ss)
+        //bs ~ 8inch diameter
+        var bs = .203
+        total_big = Math.floor(1.3/bs) * Math.floor(perc_big*total_length/bs)
+
+        var tbp = document.getElementById('total-big')
+        tbp.innerHTML = total_big
+        var tsp = document.getElementById('total-small')
+        tsp.innerHTML = total_small
+
+        var tsap = document.getElementById('total-saplings')
+        tsap.innerHTML = total_small + total_big
+
+
+
+    }
+    function drawFence(l, w, d){
+        clearCanvas()
+        var dx = 0
+        var dy = 0
+        pr = Math.log(2*d + 2)
+        var pnt = new Point(canvas.width/2 - dis, canvas.height/2 - dis*ratio)
+        var total_poles = 0
+        var dis = 200
+        var wid = w
+        var len = l
+        var ratio = l/w
+        if (ratio > 1){
+            ratio = 1/ratio
+            len = w
+            wid = l
+        }
+        var p1 = new Point(canvas.width/2 - dis, canvas.height/2 - dis*ratio)
+        var p2 = new Point(canvas.width/2 + dis, canvas.height/2 - dis*ratio)
+        var p3 = new Point(canvas.width/2 + dis, canvas.height/2 + dis*ratio)
+        var p4 = new Point(canvas.width/2 - dis, canvas.height/2 + dis*ratio)
+
+        drawLine(p1 , p2, 'black')
+        drawLine(p2 , p3, 'black')
+        drawLine(p3 , p4, 'black')
+        drawLine(p4 , p1, 'black')
+
+        c.font = "12px Arial"
+        c.fillStyle = 'black'
+        c.textAlign = 'center'
+        c.fillText(wid, canvas.width/2, canvas.height/2 - dis*ratio - 10)
+        c.fillText(len, canvas.width/2 - 1.3*dis, canvas.height/2)
+
+
+        //top
+        var limit = wid/d
+        console.log('remm',wid%d)
+        console.log('limit ',limit)
+        if (wid%d != 0){
+            limit = Math.round(limit - 1)
+            console.log('limit ',limit)
+        }
+        dx = wid/limit
+        for (var i = 0; i < limit+ 1; i++){
+            x = i* 2*dis/(limit)
+            pnt = new Point(canvas.width/2 - dis + x, canvas.height/2 - dis*ratio)
+            drawCircle(pnt, pr, 'rgba(0,255,0,0.5)', 'red')
+            total_poles += 1
+        }
+
+        //bottom
+        for (var i = 1; i < limit; i++){
+            x = i* 2*dis/(limit)
+            pnt = new Point(canvas.width/2 - dis + x, canvas.height/2 + dis*ratio)
+            drawCircle(pnt, pr, 'rgba(0,255,0,0.5)', 'red')
+            total_poles += 1
+        }
+
+        //right
+        limit = len/d
+
+        if (len%d != 0){
+            limit = Math.round(limit - 1)
+        }
+        dy = len/limit
+        console.log('uhh rounds')
+        console.log(limit, len/d)
+        for (var i = 1; i < limit + 1; i++){
+            x = i* 2*dis/(limit)
+
+            pnt = new Point(canvas.width/2 + dis, canvas.height/2 - dis*ratio + x*ratio)
+            drawCircle(pnt, pr, 'rgba(0,255,0,0.5)', 'red')
+            total_poles += 1
+        }
+
+        //left
+        for (var i = 1; i < limit + 1; i++){
+            x = i* 2*dis/(limit)
+            pnt = new Point(canvas.width/2 - dis, canvas.height/2 - dis*ratio + x*ratio)
+            drawCircle(pnt, pr, 'rgba(0,255,0,0.5)', 'red')
+            total_poles += 1
+        }
+
+        //beds
+        var total_area = 0
+        var area = 0
+
+        var Ly = len
+        var gy = .6 //gap between rows (0.6 meters)
+        var by = 1.3 //bed size (1.3 meters)
+        var nr = (Ly - gy)/(gy + by) //number of rows
+        console.log('number of rows ',nr)
+        nr = Math.floor(nr)
+        console.log('number of rows rounded ',nr)
+        var Gy = nr*(gy + by) + gy
+        var ry = Ly - Gy
+        console.log('remainder ', ry)
+        console.log('raattio', ratio)
+        var Sdy = gy
+        var d_y = by
+        var i = 0
+        scaley = (2*dis*ratio)/Ly
+        console.log('scale y', scaley)
+
+        var x0 = canvas.width/2 - dis + by*scaley
+        var y0 = canvas.height/2 - dis*ratio
+        while(y0 +gy*scaley + ry*scaley < canvas.height/2 + dis*ratio){
+            if (i%2 == 0){
+                //gap
+                d_y = gy
+            }
+            else{
+                //bed
+                d_y = by
+                drawRec(x0, y0, 2*dis - 2*by*scaley, d_y*scaley, 'rgba(0,0,100,0.4)')
+            }
+            y0 += d_y*scaley
+            i++
+
+        }
+
+        /*
+        while (canvas.height/2 - dis*ratio + (Sdy + dy)/ratio < canvas.height/2 + dis*ratio){
+            if (i%2 != 0){
+                dy = by
+                //drawRec(canvas.width/2 - dis, canvas.height/2 - dis*ratio + Sdy/ratio, 2*dis,  (dy)/ratio, 'rgba(0,0,100,0.4)')
+                //console.log
+                drawRec(canvas.width/2 - dis, canvas.height/2 - dis*ratio + Sdy/ratio, 2*dis,  dy*scaley, 'rgba(0,0,100,0.4)')
+            }
+            else{
+                dy = gy
+            }
+            //drawRec(canvas.width/2 - dis, canvas.height/2 - dis*ratio + Sdy*ratio, canvas.width/2 + dis, canvas.height/2 - dis*ratio + (Sdy + dy)*ratio, 'black')
+            //drawRec(canvas.width/2 - dis, canvas.height/2 - dis*ratio + Sdy/ratio, 2*dis,  (Sdy + dy)/ratio, 'black')
+
+            area = 0//TODO change to area
+            total_area += area
+
+            Sdy += dy/ratio
+            i++
+        }
+        */
+
+
+
+
+        //writeout
+        total_length = 2*l + 2*w
+        writeOut(total_poles, total_length,d, dx, dy, nr, by, wid-1.2)
+
+    }
+
+    function calcFence(){
+        var f_l, f_w, f_d2p = 0
+        f_l = parseFloat(document.getElementById('f-length').value)
+        console.log(f_l)
+        f_w = parseFloat(document.getElementById('f-width').value)
+        console.log(f_w)
+        f_d2p = parseFloat(document.getElementById('f-d2p').value)
+        console.log(f_d2p)
+
+
+        drawFence(f_l, f_w, f_d2p)
+
+
+
+
+    }
+</script>
+</body>
+</html>
